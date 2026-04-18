@@ -13,8 +13,6 @@ final class Plugin
     public const SCHEMA_OPTION = 'ffl_fs_schema_version';
     private const SCHEMA_REVISION = 4;
 
-    private const LEGACY_DEFAULT_SHARED_SECRET = 'ffl-sync-2025-secret';
-
     public const ACTION_DISPATCH = 'ffl_funnels_sync_dispatch';
 
     public const AS_GROUP = 'ffl-funnels-sync';
@@ -61,7 +59,7 @@ final class Plugin
     }
 
     /**
-     * Encrypts any plaintext secret still sitting in wp_options and drops the legacy shipped default.
+     * Encrypts any plaintext secret still sitting in wp_options.
      */
     public static function migrate_plaintext_secret(): void
     {
@@ -71,18 +69,7 @@ final class Plugin
         }
 
         $secret = isset($opts['secret']) ? (string) $opts['secret'] : '';
-        if ($secret === '') {
-            return;
-        }
-
-        if (self::is_legacy_default_secret($secret)) {
-            $opts['secret'] = '';
-            update_option(self::OPT_KEY, $opts, true);
-
-            return;
-        }
-
-        if (Crypto::is_encrypted($secret)) {
+        if ($secret === '' || Crypto::is_encrypted($secret)) {
             return;
         }
 
@@ -217,7 +204,6 @@ final class Plugin
             }
         }
 
-        $opts = self::remove_insecure_default_secret($opts);
         $opts = self::encrypt_secret_option_if_needed($opts);
 
         update_option(self::OPT_KEY, $opts, true);
@@ -269,41 +255,6 @@ final class Plugin
         }
 
         return $opts;
-    }
-
-    /**
-     * @param array<string, mixed> $opts
-     *
-     * @return array<string, mixed>
-     */
-    private static function remove_insecure_default_secret(array $opts): array
-    {
-        $secret = isset($opts['secret']) ? (string) $opts['secret'] : '';
-        if ($secret === '') {
-            return $opts;
-        }
-
-        if (!self::is_legacy_default_secret($secret)) {
-            return $opts;
-        }
-
-        $opts['secret'] = '';
-
-        return $opts;
-    }
-
-    private static function is_legacy_default_secret(string $secret): bool
-    {
-        try {
-            $plaintext = Crypto::decrypt_or_legacy($secret);
-        } catch (\Throwable $e) {
-            Logger::error('legacy secret check: ' . $e->getMessage());
-
-            return false;
-        }
-
-        return $plaintext !== ''
-            && hash_equals(self::LEGACY_DEFAULT_SHARED_SECRET, $plaintext);
     }
 
     private static function schema_revision(): int
