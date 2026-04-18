@@ -26,6 +26,8 @@ The plugin header and `FFL_FS_VERSION` stay at **1.0.0** until the first product
 2. Activate **FFL Funnels Sync** in wp-admin.
 3. Open **WooCommerce -> FFL Funnels Sync** and enter the webhook URL and shared secret for this site.
 
+Use **Test connection now** on that screen (after saving, if needed) to POST a signed `connection_test` event; success means HTTPS, host allowlist (if used), secret, and signature headers were accepted with HTTP 2xx. Your dashboard must treat that payload like other webhooks (verify HMAC); if it returns an error status for unknown event types, the test may fail while real order events still work.
+
 The plugin does not ship a default endpoint or secret. Orders start syncing once the admin fills those in, or once they are defined in `wp-config.php`:
 
 ```php
@@ -57,6 +59,7 @@ Verify using the raw request body (before JSON decode). Reject stale timestamps 
 
 ## Filters
 
+- `ffl_fs_connection_test_payload` - adjust the JSON body for **Test connection now** (default event name `connection_test`).
 - `ffl_fs_payload` - adjust the outbound array before signing. Receives the payload, `WC_Order`, event name, and refund ID.
 - `ffl_fs_force_resend` - return `true` to allow sending a previously delivered event again. Receives the legacy boolean, `WC_Order`, event key, event name, and refund ID.
 - `ffl_fs_allowed_webhook_hosts` - return an array of allowed hostname strings (for example `['ads-dashboard.fflfunnels.com']`) to block requests to any other host. Default `null` means no extra host restriction (HTTPS + valid URL still required).
