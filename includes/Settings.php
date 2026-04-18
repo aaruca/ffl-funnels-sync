@@ -9,8 +9,6 @@ final class Settings
 {
     private const PAGE_SLUG = 'ffl-funnels-sync';
 
-    private const SECRET_MIN_LENGTH = 32;
-
     private static function secret_managed_by_constant(): bool
     {
         return (defined('FFL_FUNNELS_SYNC_SECRET') && (string) \constant('FFL_FUNNELS_SYNC_SECRET') !== '')
@@ -89,26 +87,14 @@ final class Settings
         $secret       = (string) ($existing['secret'] ?? '');
 
         if ($secret_input !== '') {
-            if (strlen($secret_input) < self::SECRET_MIN_LENGTH) {
+            try {
+                $secret = Crypto::encrypt_secret($secret_input);
+            } catch (\Throwable $e) {
                 add_settings_error(
                     self::PAGE_SLUG,
-                    'ffl_fs_secret_length',
-                    sprintf(
-                        /* translators: %d: minimum number of characters required for the shared secret. */
-                        __('Shared secret must be at least %d characters long.', 'ffl-funnels-sync'),
-                        self::SECRET_MIN_LENGTH
-                    )
+                    'ffl_fs_crypto',
+                    __('Could not encrypt the shared secret. Check that OpenSSL is enabled and WordPress security keys are set.', 'ffl-funnels-sync')
                 );
-            } else {
-                try {
-                    $secret = Crypto::encrypt_secret($secret_input);
-                } catch (\Throwable $e) {
-                    add_settings_error(
-                        self::PAGE_SLUG,
-                        'ffl_fs_crypto',
-                        __('Could not encrypt the shared secret. Check that OpenSSL is enabled and WordPress security keys are set.', 'ffl-funnels-sync')
-                    );
-                }
             }
         }
 
