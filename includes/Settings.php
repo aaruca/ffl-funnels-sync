@@ -31,6 +31,7 @@ final class Settings
     {
         add_action('admin_menu', [$this, 'add_menu']);
         add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_post_ffl_fs_connection_test', [$this, 'handle_connection_test']);
         add_filter('plugin_action_links_' . plugin_basename(FFL_FS_FILE), [$this, 'action_links']);
     }
 
@@ -138,6 +139,53 @@ final class Settings
         return $links;
     }
 
+    public function handle_connection_test(): void
+    {
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(esc_html__('You do not have permission to run this action.', 'ffl-funnels-sync'));
+        }
+
+        check_admin_referer('ffl_fs_connection_test');
+
+        $tkey = $this->connection_test_transient_key();
+
+        try {
+            (new Dispatcher())->send(Dispatcher::connection_test_payload());
+            set_transient(
+                $tkey,
+                [
+                    'ok'  => true,
+                    'msg' => __('The webhook responded with HTTP 2xx using the current URL, secret, and signature headers.', 'ffl-funnels-sync'),
+                ],
+                120
+            );
+        } catch (\Throwable $e) {
+            set_transient(
+                $tkey,
+                [
+                    'ok'  => false,
+                    'msg' => sprintf(
+                        /* translators: %s: error message from the HTTP client or Dispatcher. */
+                        __('Connection test failed: %s', 'ffl-funnels-sync'),
+                        wp_strip_all_tags($e->getMessage())
+                    ),
+                ],
+                120
+            );
+        }
+
+        wp_safe_redirect(admin_url('admin.php?page=' . self::PAGE_SLUG));
+        exit;
+    }
+
+    /**
+     * One-shot notice after the connection test redirect (admin_post).
+     */
+    private function connection_test_transient_key(): string
+    {
+        return 'ffl_fs_conn_test_' . (string) get_current_user_id();
+    }
+
     public function render(): void
     {
         if (!current_user_can('manage_woocommerce')) {
@@ -153,6 +201,24 @@ final class Settings
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('FFL Funnels Sync', 'ffl-funnels-sync'); ?></h1>
+
+            <?php settings_errors(self::PAGE_SLUG); ?>
+
+            <?php
+            $conn = get_transient($this->connection_test_transient_key());
+            if (is_array($conn)) {
+                delete_transient($this->connection_test_transient_key());
+                $class = !empty($conn['ok']) ? 'notice-success' : 'notice-error';
+                $msg   = isset($conn['msg']) ? (string) $conn['msg'] : '';
+                if ($msg !== '') {
+                    printf(
+                        '<div class="notice %1$s is-dismissible"><p>%2$s</p></div>',
+                        esc_attr($class),
+                        esc_html($msg)
+                    );
+                }
+            }
+            ?>
 
             <?php if (!$configured) : ?>
                 <div class="notice notice-warning">
@@ -240,6 +306,34 @@ final class Settings
                 </table>
                 <?php submit_button(); ?>
             </form>
+
+            <hr />
+
+            <h2><?php esc_html_e('Connection test', 'ffl-funnels-sync'); ?></h2>
+            <p class="description">
+                <?php esc_html_e(
+                    'Sends a signed JSON payload (event connection_test) with the same headers as real order webhooks. Save settings first if you changed URL or secret.',
+                    'ffl-funnels-sync'
+                ); ?>
+            </p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('ffl_fs_connection_test'); ?>
+                <input type="hidden" name="action" value="ffl_fs_connection_test" />
+                <?php
+                submit_button(
+                    __('Test connection now', 'ffl-funnels-sync'),
+                    'secondary',
+                    'submit',
+                    false,
+                    Plugin::is_configured() ? [] : ['disabled' => true]
+                );
+                ?>
+            </form>
+            <?php if (!Plugin::is_configured()) : ?>
+                <p class="description">
+                    <?php esc_html_e('Configure webhook URL and shared secret above (or wp-config constants) before testing.', 'ffl-funnels-sync'); ?>
+                </p>
+            <?php endif; ?>
         </div>
         <?php
     }
