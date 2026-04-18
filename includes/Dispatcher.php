@@ -36,6 +36,23 @@ final class Dispatcher
     }
 
     /**
+     * Minimal signed payload for the "Test connection" action in wp-admin.
+     *
+     * @return array<string, mixed>
+     */
+    public static function connection_test_payload(): array
+    {
+        $payload = [
+            'event'          => 'connection_test',
+            'site'           => home_url(),
+            'plugin_version' => FFL_FS_VERSION,
+            'sent_at'        => gmdate(\DATE_ATOM),
+        ];
+
+        return (array) apply_filters('ffl_fs_connection_test_payload', $payload);
+    }
+
+    /**
      * @param array<string, mixed> $payload
      *
      * @throws \RuntimeException
