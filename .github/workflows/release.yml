@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Match tag to plugin version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eux
+          TAGVER="${TAG#v}"
+          HVER=$(grep '^\s*\* Version:' ffl-funnels-sync.php | head -1 | sed -E 's/.*Version:[[:space:]]+([0-9.]+).*/\1/')
+          CVER=$(grep "const FFL_FS_VERSION" ffl-funnels-sync.php | sed -E "s/.*'([0-9.]+)'.*/\1/")
+          if [ "$TAGVER" != "$HVER" ] || [ "$TAGVER" != "$CVER" ]; then
+            echo "::error::Version mismatch: tag=$TAGVER plugin header=$HVER FFL_FS_VERSION=$CVER. Bump the plugin, commit, then retag."
+            exit 1
+          fi
+
+      - name: Build distributable zip
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eux
+          TAGVER="${TAG#v}"
+          git archive --format=zip --prefix=ffl-funnels-sync/ -o "ffl-funnels-sync-${TAGVER}.zip" HEAD
+          unzip -l "ffl-funnels-sync-${TAGVER}.zip" | head -40
+          if unzip -l "ffl-funnels-sync-${TAGVER}.zip" | grep -q '\.github/'; then
+            echo '::error::.github/ leaked into the zip. Check .gitattributes export-ignore.'
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ffl-funnels-sync-*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

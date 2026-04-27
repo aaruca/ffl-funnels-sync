@@ -2,9 +2,13 @@
 
 WordPress plugin: sends WooCommerce order events to the FFL Funnels ads dashboard using a signed HTTPS webhook. Delivery is event-driven through WooCommerce hooks, with Action Scheduler used when available and one-off retries scheduled when a delivery fails.
 
-## Versioning
+## Versioning and releases
 
-The plugin header and `FFL_FS_VERSION` stay at **1.0.0** until the first production release. Internal data migrations use a separate option (`ffl_fs_schema_version`, integer revision) instead of the marketing version string.
+- The **plugin header** `Version`, the PHP constant `FFL_FS_VERSION`, and the **annotated tag** (for example `v1.0.0`) must **match** on each public release. GitHub Actions will refuse to build a release asset if they diverge.
+- **Git tags** use SemVer: `vMAJOR.MINOR.PATCH`. Pushing a tag of the form `v*.*.*` runs the [Release workflow](.github/workflows/release.yml) and publishes `ffl-funnels-sync-MAJOR.MINOR.PATCH.zip` on the [Releases](https://github.com/aaruca/ffl-funnels-sync/releases) page. That zip is created with `git archive` and [excludes](.gitattributes) `.github/` and other repo-only files so the package matches what you would upload to a site.
+- **Schema** migrations use a separate option, `ffl_fs_schema_version` (integer), not the marketing version string. Bump that only when the stored option shape or encryption layout changes.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Requirements
 
@@ -20,7 +24,15 @@ The plugin header and `FFL_FS_VERSION` stay at **1.0.0** until the first product
 - **Outbound webhooks:** HTTPS only, TLS verification on, HMAC signature on every request. Optional host allowlist via filter `ffl_fs_allowed_webhook_hosts` (see `includes/Security.php`).
 - **Logs:** When debug logging is enabled, messages are passed through `Security::redact_log_message()` (strips HTML and masks email-like strings).
 
-## Install
+## Install (from a release zip, recommended)
+
+1. Open [Releases](https://github.com/aaruca/ffl-funnels-sync/releases) and download the latest `ffl-funnels-sync-x.y.z.zip` (not "Source code", unless you are developing the plugin).
+2. In WordPress: **Plugins -> Add New -> Upload Plugin** and choose the file, *or* unzip so that `wp-content/plugins/ffl-funnels-sync/` contains `ffl-funnels-sync.php` and the `includes/` directory.
+3. Activate **FFL Funnels Sync**, then go to **WooCommerce -> FFL Funnels Sync** and set the webhook URL and shared secret.
+
+**Note:** A plain clone or "Download ZIP" of the whole repository is fine for development, but the installable build for production is the **release asset** (smaller, no `.github/` or git metadata in the tree).
+
+## Install (manual copy from source)
 
 1. Copy the `ffl-funnels-sync` folder into `wp-content/plugins/`.
 2. Activate **FFL Funnels Sync** in wp-admin.
@@ -72,3 +84,4 @@ Deactivating unschedules pending background deliveries. Uninstalling deletes `ff
 ## License
 
 GPL-2.0-or-later. See [LICENSE](LICENSE).
+

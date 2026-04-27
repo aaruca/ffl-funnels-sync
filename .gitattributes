@@ -1,0 +1,7 @@
+# Files marked export-ignore are omitted from `git archive` (release zips, Source code downloads).
+# Keeps the installable package limited to the plugin runtime + license.
+
+.github/ export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+
